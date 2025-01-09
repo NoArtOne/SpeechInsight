@@ -1,11 +1,20 @@
-FROM python:3.9-slim
+# Используем официальный образ Python 3.12.3
+FROM python:3.12.3-slim
 
-# WORKDIR /app
+# Устанавливаем рабочую директорию
+WORKDIR /app
 
-# COPY requirements.txt requirements.txt
-# RUN pip install -r requirements.txt
+# Копируем файл requirements.txt в контейнер
+COPY requirements.txt requirements.txt
 
-# COPY . .
+# Устанавливаем зависимости
+RUN pip install -r requirements.txt
 
-# CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-# Продумать как будет готов каждый модуль
+# Копируем остальные файлы проекта в контейнер
+COPY . .
+
+# Копируем модель Whisper в контейнер
+COPY whisper /app/whisper
+
+# Команда для запуска приложения
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from app.models import User, MLModel, TransactionHistory, MLTask
 from app.database import SessionLocal, engine
 from app.schemas import UserCreate, UserLogin, TransactionCreate, MLTaskCreate
 from app.crud import get_user_by_username, create_user, authenticate_user, add_balance, get_balance, get_transaction_history, create_transaction, create_ml_task, get_ml_task_result
+from app.services import transcribe_audio
 
 router = APIRouter()
 
@@ -42,8 +43,18 @@ def get_transaction_history(current_user: User = Depends(get_current_user)):
     return get_transaction_history(current_user.id)
 
 @router.post("/ml_task/")
-def create_ml_task(task: MLTaskCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return create_ml_task(db=db, user_id=current_user.id, task_data=task.task_data)
+async def create_ml_task(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Сохранение аудио файла
+    audio_path = f"uploads/{file.filename}"
+    with open(audio_path, "wb") as f:
+        f.write(await file.read())
+
+    # Преобразование аудио в текст
+    text = transcribe_audio(audio_path)
+
+    # Создание задачи ML
+    task = create_ml_task(db=db, user_id=current_user.id, task_data=text)
+    return task
 
 @router.get("/ml_task_result/{task_id}")
 def get_ml_task_result(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
