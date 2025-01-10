@@ -1,0 +1,73 @@
+version: "3"
+services:
+  # bertanswer1:
+  #   build: ./BertAnswer/
+  #   depends_on:
+  #     - rabbitmq
+
+  # bertanswer2:
+  #   build: ./BertAnswer/
+  #   depends_on:
+  #     - rabbitmq
+
+  # app:
+  #   build: ./app/
+  #   image: event-planner-api:latest 
+  #   env_file:
+  #   - ./app/.env
+  #   volumes:
+  #     - ./app:/app
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     - db
+  #     - rabbitmq
+  #     - bertanswer1
+  #     - bertanswer2
+
+  # web:
+  #   build: ./web/
+  #   ports:
+  #    - "5173:5173"
+  #   depends_on:
+  #    - app
+
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data/
+    #
+    expose:
+      - 5432
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=speechinsight_db
+    ports: 
+     - "5432:5432"
+     
+  web:
+    image: python:3.12.3-alpine
+    command: sh  -c "cd app && ls && pip install -r requirements.txt && uvicorn app\main:app --host 0.0.0.0 --port 8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_NAME=${DB_NAME}
+
+  # rabbitmq:
+  #     image: rabbitmq:3-management
+  #     ports:
+  #       - "5672:5672"
+  #       - "15672:15672"
+  #     environment:
+  #       - RABBITMQ_DEFAULT_USER=guest
+  #       - RABBITMQ_DEFAULT_PASS=guest
+

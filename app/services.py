@@ -1,13 +1,38 @@
-import whisper
+import sys
 import os
 
-# Путь к модели Whisper
-model_path = os.path.join(os.path.dirname(__file__), 'whisper')
+# # Добавляем путь к модулю whisper в системный путь
+# sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'whisper'))
+# import whisper
+# from models import User
 
-def transcribe_audio(audio_path):
-    # Загрузка модели
-    model = whisper.load_model("base", download_root=model_path)
+from schemas import UserResponse
 
-    # Преобразование аудио в текст
-    result = model.transcribe(audio_path)
-    return result["text"]
+
+
+async def register_user(user: UserResponse):
+    # Реализация регистрации пользователя
+    pass
+
+# async def login_user(user: UserLogin):
+#     # Реализация аутентификации пользователя
+#     pass
+
+# async def get_balance(user: User):
+#     # Реализация получения баланса пользователя
+#     pass
+
+# async def top_up_balance(user: User, amount: int):
+#     # Реализация пополнения баланса пользователя
+#     pass
+
+# async def make_prediction(request: PredictionRequest, user: User):
+#     # Реализация предсказания с использованием модели Whisper
+#     model = whisper.load_model("base")
+#     result = model.transcribe(request.file)
+#     # Обработка результата и списание кредитов
+#     return PredictionResponse(text=result["text"], participants=["Participant 1", "Participant 2"], credits_spent=10)
+
+# async def get_history(user: User):
+#     # Реализация получения истории запросов пользователя
+#     pass
