@@ -23,9 +23,9 @@ from bcrypt import hashpw, gensalt, checkpw
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
-# @router.get("/register")
-# async def register_form(request: Request):
-#     return templates.TemplateResponse("register.html", {"request": request})
+@router.get("/register")
+async def register_form(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request})
 
 @router.post("/register")
 async def register_user(user: UserRegistration, session: Session = Depends(get_session)):

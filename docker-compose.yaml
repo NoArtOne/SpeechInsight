@@ -47,10 +47,10 @@ services:
      - "5432:5432"
      
   web:
-    image: python:3.12.3-alpine
-    command: sh  -c "cd app && ls && pip install -r requirements.txt && uvicorn app\main:app --host 0.0.0.0 --port 8000"
+    image: python:3.11-alpine
+    command: sh  -c "cd speechinsight && pip install -r requirements.txt && cd app && ls && uvicorn app\main:app --host 0.0.0.0 --port 8000"
     volumes:
-      - .:/app
+      - .:/speechinsight
     ports:
       - "8000:8000"
     depends_on:
