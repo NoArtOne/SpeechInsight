@@ -7,6 +7,7 @@ import tempfile
 from dotenv import load_dotenv
 
 load_dotenv()
+
 """
 Этот код когда тестил mq
 RABBITMQ_HOST = 'localhost'
@@ -14,13 +15,13 @@ RABBITMQ_QUEUE = 'audio_queue'
 RESULT_QUEUE = 'result_queue_1'
 """
 
-# RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
-# RABBITMQ_QUEUE = os.getenv("RESULT_QUEUE")
-# RESULT_QUEUE = os.getenv("RESULT_QUEUE")
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
+RABBITMQ_QUEUE = os.getenv("RESULT_QUEUE")
+RESULT_QUEUE = os.getenv("RESULT_QUEUE")
 
-RABBITMQ_HOST = 'localhost'
-RABBITMQ_QUEUE = 'audio_queue'
-RESULT_QUEUE = 'result_queue_1'
+# RABBITMQ_HOST = 'localhost'
+# RABBITMQ_QUEUE = 'audio_queue'
+# RESULT_QUEUE = 'result_queue_1'
 
 def send_to_rabbitmq(audio_bytes, original_format):
     """

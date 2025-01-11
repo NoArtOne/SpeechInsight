@@ -9,6 +9,9 @@ from datetime import datetime
 
 
 class User(SQLModel, table=True):
+    """
+    password хешированный 
+    """
     id: Optional[int] = Field(primary_key=True, unique=True)
     email: str = Field(index=True, unique=True)
     password: bytes
@@ -18,6 +21,19 @@ class User(SQLModel, table=True):
     role: str = Field(default="user")
     transactions: List["Transaction"] = Relationship(back_populates="user")
     requests: List["Request"] = Relationship(back_populates="user")
+    status: str = Field(default="disable")
+
+class ConfirmationCode(SQLModel, table=True):
+    """
+    Хранит коды подтверждения для регистарции в сервисе
+    code 4-значный код
+    expires_at Время истечения кода
+    """
+    id: Optional[int] = Field(primary_key=True, unique=True)
+    user_id: int = Field(foreign_key="user.id")
+    code: int  # 4-значный код
+    expires_at: datetime  # Время истечения кода
+    create_at: datetime = Field(default_factory=datetime.now)
 
 class Transaction(SQLModel, table=True):
     """
@@ -28,7 +44,7 @@ class Transaction(SQLModel, table=True):
     user_id: int = Field(index=True, foreign_key="user.id")
     amount: int  
     amount_type: str  
-    timestamp: datetime = Field(default_factory=datetime.now)
+    create_at: datetime = Field(default_factory=datetime.now)
     user: User = Relationship(back_populates="transactions")
     request_id: Optional[int] = Field(foreign_key="request.id", nullable=True)
     request: Optional["Request"] = Relationship(back_populates="transactions")

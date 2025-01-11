@@ -6,7 +6,7 @@
 class Config:
     from_attributes = True
 """
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, constr
 from datetime import datetime
 from typing import List, Optional
 
@@ -20,9 +20,15 @@ class TokenData(BaseModel):
 class UserRegistration(BaseModel):
     email: EmailStr
     password: str
+    #TODO Call expression not allowed in type expressionPylancereportInvalidTypeForm 
+    # password: constr(strip_whitespace=True, min_length=7, regex=r'^(?=.*[\p{L}])(?=.*[@!#$_-]).{7,}$')
 
     class Config:
         from_attributes = True
+    
+class UserVerifyCode(BaseModel):
+    email: EmailStr
+    code: str
 
 class UserResponse(BaseModel):
     id: int
@@ -34,3 +40,6 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class CheckEmail(BaseModel):
+    email: EmailStr

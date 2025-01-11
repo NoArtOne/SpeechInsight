@@ -3,6 +3,8 @@ from email.message import EmailMessage
 import os
 from dotenv import load_dotenv
 
+from schemas import CheckEmail
+
 load_dotenv()
 
 SMTP_EMAIL=os.getenv("SMTP_EMAIL")
@@ -11,7 +13,7 @@ SMTP_SERVER=os.getenv("SMTP_SERVER")
 SMTP_PORT=int(os.getenv("SMTP_PORT"))
 
 # Функция отправки письма
-def send_email(dest_email, subject, email_text):
+def send_email(dest_email: CheckEmail, subject_text: str, email_text:str):
     """
     # Использование функции
     send_email(
@@ -22,14 +24,12 @@ def send_email(dest_email, subject, email_text):
         dest_mail кому отправляем
         subject заголовок (header) письма
         email_text текст (body) письма  
-
-
 )
     """
     msg = EmailMessage()
     msg["From"] = SMTP_EMAIL
     msg["To"] = dest_email
-    msg["Subject"] = subject
+    msg["Subject"] = subject_text
     msg.set_content(email_text, subtype="plain", charset="utf-8") 
 
     # Подключаемся к серверу
@@ -37,5 +37,10 @@ def send_email(dest_email, subject, email_text):
         server.login(SMTP_EMAIL, SMTP_PASSWORD)
         server.send_message(msg)
 
+from datetime import datetime, timedelta
+import time
 
-
+def has_30_seconds_passed(start_time: datetime, CODE_REPEAT_RESPONSE_TIME: int):
+    current_time = datetime.now()
+    elapsed_time = current_time - start_time
+    return elapsed_time > timedelta(seconds=CODE_REPEAT_RESPONSE_TIME)

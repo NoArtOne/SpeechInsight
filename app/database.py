@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy_utils import create_database, database_exists
-from sqlmodel import Session
+from sqlmodel import SQLModel, Session
 from dotenv import load_dotenv
 import os
 from urllib.parse import quote_plus
@@ -25,8 +25,8 @@ else:
     print("Database Already Exists")
 
 def init_db():
-    # SQLModel.metadata.drop_all(engine)
-    # SQLModel.metadata.create_all(engine)
+    SQLModel.metadata.drop_all(engine)
+    SQLModel.metadata.create_all(engine)
     pass
     
 def get_session():

@@ -1,9 +1,9 @@
 # version: "3.8"
 services:
-  whisper:
-    build: ./whisper/
-    depends_on:
-      - rabbitmq
+  # whisper:
+  #   build: ./whisper/
+  #   depends_on:
+  #     - rabbitmq
 
   # app:
   #   build: ./app/
@@ -41,17 +41,17 @@ services:
     ports: 
      - "5432:5432"
 
-  app:
-    build: ./app/
-    image: event-planner-api:latest 
-    env_file:
-    - ./app/.env
-    volumes:
-      - ./app:/app
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
+  # app:
+  #   build: ./app/
+  #   image: event-planner-api:latest 
+  #   env_file:
+  #   - ./app/.env
+  #   volumes:
+  #     - ./app:/app
+  #   ports:
+  #     - "8000:8000"
+  #   depends_on:
+  #     - db
      
   # web:
   #   image: python:3.11-alpine
@@ -76,5 +76,5 @@ services:
         - "15672:15672"
       environment:
         - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
-        - RABBITMQ_DEFAULT_PASS=${POSTGRES_USER}
+        - RABBITMQ_DEFAULT_PASS=${POSTGRES_PASSWORD}
 
