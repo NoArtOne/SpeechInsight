@@ -26,9 +26,9 @@ async def register_user(user: UserRegistration, session: Session = Depends(get_s
     session.refresh(db_user)
     return user
 
-# @router.post("/login", response_model=User1)
-# async def login(user: UserLogin):
-#     return await login_user(user)
+@router.post("/login", response_model=User1)
+async def login(user: UserLogin):
+    return await login_user(user)
 
 # @app.post("/admin/create_user")
 # async def create_user(user: UserRegistration, session: Session = Depends(get_session)):
