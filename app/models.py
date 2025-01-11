@@ -16,14 +16,36 @@ class User(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.now, sa_column_kwargs={"onupdate": datetime.now})
     balance: int = Field(default=100)
     role: str = Field(default="user")
-    # transactions: List["Transaction"] = Relationship(back_populates="user")
+    transactions: List["Transaction"] = Relationship(back_populates="user")
+    requests: List["Request"] = Relationship(back_populates="user")
 
-# class Transaction(SQLModel, table=True):
-#     id: int = Field(default=None, primary_key=True, index=True)
-#     user_id: int = Field(ForeignKey("users.id"))
-#     amount = Field(Integer)
-#     resulting_balance: int
+class Transaction(SQLModel, table=True):
+    """
+    amount Может быть как положительной (пополнение), так и отрицательной (списание)
+    amount_type Описание транзакции (например, "Пополнение баланса", "Запрос к ML сервису")
+    """
+    id: Optional[int] = Field(primary_key=True)
+    user_id: int = Field(index=True, foreign_key="user.id")
+    amount: int  
+    amount_type: str  
+    timestamp: datetime = Field(default_factory=datetime.now)
+    user: User = Relationship(back_populates="transactions")
+    request_id: Optional[int] = Field(foreign_key="request.id", nullable=True)
+    request: Optional["Request"] = Relationship(back_populates="transactions")
 
-#     user = relationship("User", back_populates="transactions")
+class Request(SQLModel, table=True):
+    """
+    status_request True или False, если True, то транскрибация успешная, если false, то нет
+    output_text, если is_success true, то содержит транскрибацию, иначе содержит ошибку
+    cost стоимость транзакции в рублях фиксированна 
+    """
+    id: Optional[int] = Field(primary_key=True)
+    user_id: int = Field(index=True, foreign_key="user.id")
+    file_name: str
+    output_text: Optional[str]  
+    created_at: datetime = Field(default_factory=datetime.now)
+    cost: int  
+    transactions: List["Transaction"] = Relationship(back_populates="request")
+    user: User = Relationship(back_populates="requests")
+    is_success: Optional[bool] = Field(default=False)
 
-# User.transactions = relationship("Transaction", order_by=Transaction.id, back_populates="user")

@@ -4,17 +4,15 @@ from jose import JWTError, jwt
 import os
 from datetime import timedelta, datetime
 from typing import Optional
-
-from pydantic import BaseModel
 from starlette import status
+
+#Локальные импорты
+from schemas import TokenData
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-class TokenData(BaseModel):
-    id: int = None
-    email: str = None
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def create_access_token(email: str, id: int):
     data = {"email": email, "id": id}
@@ -38,6 +36,7 @@ def verify_access_token(token: str = Depends(oauth2_scheme)):
         if email is None or id is None:
             raise credentials_exception
         token_data = TokenData(id=id, email=email)
+
     except JWTError:
         raise credentials_exception
     return token_data
