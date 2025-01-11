@@ -1,7 +1,11 @@
+import asyncio
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import RedirectResponse
+from api.consumer_rabbit import start_consume
 from api.controller import router
 from database import init_db
+from contextlib import asynccontextmanager
+
 
 app = FastAPI()
 
@@ -11,7 +15,16 @@ app.include_router(router)
 async def not_found_handler(request: Request, exc: HTTPException):
     return RedirectResponse(url='/docs')
 
-if __name__ == "__main__":
+@app.on_event("startup")
+async def startup_event():
     init_db()
+    asyncio.create_task(start_consume())
+
+# @asynccontextmanager
+# async def lifespan(app)
+
+
+if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="localhost", port=8000)
+    
