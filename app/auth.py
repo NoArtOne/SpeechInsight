@@ -1,8 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-# from models import UserRegistration
-
 import os
 from datetime import timedelta, datetime
 from typing import Optional
