@@ -7,6 +7,7 @@ from sqlmodel import SQLModel, Field, ForeignKey, Relationship
 from typing import List, Optional
 from datetime import datetime
 
+#Role 
 
 class User(SQLModel, table=True):
     """
@@ -19,9 +20,10 @@ class User(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.now, sa_column_kwargs={"onupdate": datetime.now})
     balance: int = Field(default=100)
     role: str = Field(default="user")
+    status: str = Field(default="disable")
     transactions: List["Transaction"] = Relationship(back_populates="user")
     requests: List["Request"] = Relationship(back_populates="user")
-    status: str = Field(default="disable")
+
 
 class ConfirmationCode(SQLModel, table=True):
     """

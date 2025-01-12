@@ -16,11 +16,11 @@ from sqlmodel import Session, select
 from bcrypt import hashpw, gensalt, checkpw
 from dotenv import load_dotenv
 
-from utils import send_email
+from utils import how_time_has_passed, send_email
 import os
 
+#TODO вынсти все load_dotenv() в config.py  
 load_dotenv()
-
 CODE_EXPIRATION_TIME = os.getenv("CODE_EXPIRATION_TIME")
 CODE_REPEAT_RESPONSE_TIME = os.getenv("CODE_REPEAT_RESPONSE_TIME")
 
@@ -34,10 +34,16 @@ async def register_user(user: UserRegistration, session: Session = Depends(get_s
     3. Отправляем код на email
     4. Сохраняем код в БД
     """
+    #Исключили из повторной регистрации забаненных по такому адресу и активных
     existing_user = session.exec(select(User).where(User.email == user.email)).first()
-    if existing_user:
+    if existing_user and existing_user.status == "banned" or existing_user and existing_user.status == "active":
         raise HTTPException(status_code=400, detail="Пользователь с таким email уже зарегистрирован")
     
+    #Для облегчения удаляем тех, кто не активировался до конца и идем дальше по процессу регистрации
+    if existing_user and existing_user.status == "disable":
+        session.delete(db_code)
+        session.commit()
+
     confirmation_code = str(randint(1000, 9999))
 
     hashed_password = hashpw(user.password.encode('utf-8'), gensalt())
@@ -63,79 +69,102 @@ async def register_user(user: UserRegistration, session: Session = Depends(get_s
     )
     return f"message: Код подтверждения отправлен на почту пользователя {user}, {confirmation_code}"
 
-# @router.post("/register/verify_code")
-# async def verify_code(data: UserVerifyCode, session: Session = Depends(get_session)):
-#     """
-#     1. Проверяем, есть ли код в базе
-#     2. Проверяем, совпадает ли код и не истёк ли он
-#     3. Если всё ок – удаляем код из базы и завершаем регистрацию
-#     """
+@router.post("/register/verify_code")
+async def verify_code(data: UserVerifyCode, session: Session = Depends(get_session)):
+    """
+    1. Проверяем, есть ли код в базе
+    2. Проверяем, совпадает ли код и не истёк ли он
+        2.1. Если код истёк, он авт. перезапрашивается
+    3. Если всё ок – удаляем код из базы и завершаем регистрацию
+    """
+    db_user = session.exec(select(User).where(User.email == data.email)).first()
+    if not db_user:
+        print("Пользователь не найден")
+        raise HTTPException(status_code=404, detail="Что-то пошло не так. Попробуйте зарегистрироваться \
+                            ещё раз позднее!")
+    db_code = session.exec(select(ConfirmationCode).where(ConfirmationCode.user_id == db_user.id)).first()
+
+    if db_code:
+        is_expired, elapsed_time = how_time_has_passed(db_code.create_at, CODE_EXPIRATION_TIME)
+        if is_expired==True:
+            resend_code(email=data.email, session=session)
+            #TODO print("Реализовать устаревание и удаление кода авторизации") celory
+            raise HTTPException(status_code=404, detail="Код подтверждения устарел, прошло более 30 минут.\
+                                 На вашу почту отправлен новый код авторизации")
+        elif is_expired==False:
+            session.delete(db_code)
+            session.commit()
+            db_user = ConfirmationCode(status="activate")
+            session.add(db_user)
+            session.commit()
+            session.refresh(db_user)
+            return {"message": "Регистрация успешно завершена!"}
+
+    if not db_code:
+        resend_code(email=data.email, session=session)
+        return {
+            "message": "Код подтверждения устарел. На вашу почту отправлен новый код авторизации.",
+        }
+    if not db_code:
+        raise HTTPException(status_code=408, detail="Код подтверждения устарел, на вашу почту отправлен \
+                            новый код")
+
+    if db_code.code != data.code:
+        raise HTTPException(status_code=400, detail="Неверный код подтверждения. Попробуйте ещё раз или \
+                            запросить код повторно")
+
  
-#     db_code = session.exec(
-#         select(ConfirmationCode).where(ConfirmationCode.user_id == select(User.id).where(User.email == data.email))
-#     ).first()
+@router.post("/register/resend_code")
+async def resend_code(data: UserVerifyCode, session: Session = Depends(get_session)):
+    """
+    1. Проверяем, есть ли пользователь
+    2. Если код ещё не истёк – не отправляем новый
+    3. Если истёк – создаём новый и отправляем
+    """
+    db_user = session.exec(select(User).where(User.email == data.email)).first()
+    if not db_user:
+        print("Пользователь не найден")
+        raise HTTPException(status_code=404, detail="Что-то пошло не так. Попробуйте зарегистрироваться \
+                            ещё раз позднее!")
 
-#     if not db_code:
-#         raise HTTPException(status_code=404, detail="Код подтверждения не найден")
+    db_code = session.exec(select(ConfirmationCode).where(ConfirmationCode.user_id == db_user.id)).first()
+    if db_code:
+        is_expired, elapsed_time = how_time_has_passed(db_code.create_at, CODE_REPEAT_RESPONSE_TIME)
+        if is_expired==True:
 
-#     if db_code.code != data.code:
-#         raise HTTPException(status_code=400, detail="Неверный код подтверждения")
-    
-#     if db_code.expires_at < datetime.now():
-#         raise HTTPException(status_code=400, detail="Код истёк, запросите новый")
+            new_code = str(randint(1000, 9999))
 
-#     session.delete(db_code)
-#     session.commit()
+            if db_code:
+                db_code.code = new_code
+                db_code.expires_at = datetime.now() + CODE_EXPIRATION_TIME
+            else:
+                db_code = ConfirmationCode(
+                    user_id=db_user.id,
+                    code=new_code,
+                    expires_at=datetime.now() + CODE_EXPIRATION_TIME
+                )
 
-#     return {"message": "Регистрация успешно завершена!"}
+            session.add(db_code)
+            session.commit()
+
+            send_email(
+            dest_email=data.email,
+            subject="Новый код подтверждения",
+            email_text=f"Ваш новый код подтверждения: {new_code}"
+            )
+            return {
+                f"message: Код подтверждения успешно отправлен на вашу почту отправлен новый код \
+                    авторизации, новый код вы сможете запросить через 30 секунд"
+                }
+        
+        elif is_expired==False:
+            raise HTTPException(status_code=425, detail=f"Вы запрашивали код авторизации \
+                                {timedelta(seconds=datetime.now())-elapsed_time} секунд назад, подождите")
 
 
-# @router.post("/register/resend_code")
-# async def resend_code(email: UserVerifyCode, session: Session = Depends(get_session)):
-#     """
-#     1. Проверяем, есть ли пользователь
-#     2. Если код ещё не истёк – не отправляем новый
-#     3. Если истёк – создаём новый и отправляем
-#     """
-#     db_user = session.exec(select(UserVerifyCode).where(UserVerifyCode.email == email)).first()
-#     if not db_user:
-#         raise HTTPException(status_code=404, detail="Пользователь не найден")
-
-#     db_code = session.exec(select(ConfirmationCode).where(ConfirmationCode.user_id == db_user.id)).first()
-#     if db_code and (datetime.now() - db_code.create_at) > :
-#         raise HTTPException(status_code=400, detail="Код ещё действителен, повторите попытку позже")
-
-#     # Генерируем новый код
-#     new_code = str(randint(1000, 9999))
-
-#     # Обновляем или создаём код
-#     if db_code:
-#         db_code.code = new_code
-#         db_code.expires_at = datetime.now() + CODE_EXPIRATION_TIME
-#     else:
-#         db_code = ConfirmationCode(
-#             user_id=db_user.id,
-#             code=new_code,
-#             expires_at=datetime.utcnow() + CODE_EXPIRATION_TIME
-#         )
-#         session.add(db_code)
-
-#     session.commit()
-
-#     # Отправляем новый код
-#     send_email(
-#         dest_email=email,
-#         subject="Новый код подтверждения",
-#         email_text=f"Ваш новый код подтверждения: {new_code}"
-#     )
-
-#     return {"message": "Новый код отправлен на почту"}
-
-# @router.post("/login", response_model=User1)
+# @router.post("/login", response_model=User)
 # async def login(user: UserLogin):
-"""
-Если пользователь в статусе disable or banned, то пользователь не может авторизироваться.
-"""
+
 #     return await login_user(user)
 
 @router.post("/admin/create_user")

@@ -40,7 +40,19 @@ def send_email(dest_email: CheckEmail, subject_text: str, email_text:str):
 from datetime import datetime, timedelta
 import time
 
-def has_30_seconds_passed(start_time: datetime, CODE_REPEAT_RESPONSE_TIME: int):
+def how_time_has_passed(start_time: datetime, reference_time: int) -> tuple:
+    """
+    Принимает start_time в формате datetime и считает сколько прошло времени
+    с момента указаного в start_time, а также принимает переменную reference_time
+    если посчитанное значение превышает reference_time возвращает True, иначе
+    false
+    ARG
+        start_time: datetime, 
+        reference_time: int
+    """
     current_time = datetime.now()
     elapsed_time = current_time - start_time
-    return elapsed_time > timedelta(seconds=CODE_REPEAT_RESPONSE_TIME)
+    return {
+        elapsed_time > timedelta(seconds=int(reference_time)),
+        timedelta(seconds=elapsed_time)
+    }

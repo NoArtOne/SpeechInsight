@@ -1,0 +1,25 @@
+Для запуска проекта локально нужно использовать
+npv run dev
+
+Для загрузки его в docker 
+
+Dockerfile
+
+FROM node:20.18.1 AS builder
+WORKDIR /app
+
+COPY /package*.json .
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+FROM docker.io/nginx:alpine
+COPY ./build_config/default.conf /etc/nginx/conf.d/default.conf
+
+WORKDIR /usr/share/nginx/html
+
+RUN rm -rf *
+COPY --from=builder /app/dist .
+
+ENTRYPOINT ["nginx", "-g", "daemon off;"]

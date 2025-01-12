@@ -10,6 +10,9 @@ load_dotenv()
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
 RABBITMQ_QUEUE = os.getenv("RESULT_QUEUE")
 RESULT_QUEUE = os.getenv("RESULT_QUEUE")
+RABBITMQ_PORT=os.getenv("RABBITMQ_PORT") 
+RABBITMQ_USER=os.getenv("RABBITMQ_USER") 
+RABBITMQ_PASS=os.getenv("RABBITMQ_PASS")
 print(f"RABBITMQ_HOST: {RABBITMQ_HOST}, RABBITMQ_QUEUE:{RABBITMQ_QUEUE}, RESULT_QUEUE:{RESULT_QUEUE}")
 
 """
@@ -21,7 +24,7 @@ print(f"RABBITMQ_HOST: {RABBITMQ_HOST}, RABBITMQ_QUEUE:{RABBITMQ_QUEUE}, RESULT_
 
 async def start_consume():
     # connection = await aio_pika.connect_robust("amqp://guest:guest@localhost:5672/")
-    connection = await aio_pika.connect_robust(f"amqp://guest:guest@{RABBITMQ_HOST}:5672/")
+    connection = await aio_pika.connect_robust(f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASS}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/")
     async with connection:
         channel = await connection.channel()
         queue = await channel.declare_queue(RESULT_QUEUE)

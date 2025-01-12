@@ -14,6 +14,7 @@ ALGORITHM = os.getenv("ALGORITHM")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+#Добавить для create_access_token schemas
 def create_access_token(email: str, id: int):
     data = {"email": email, "id": id}
     to_encode = data.copy()
