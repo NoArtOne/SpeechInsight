@@ -6,27 +6,50 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, FastAPI, File, UploadFile
 from pydantic import EmailStr
+from auth import create_access_token, verify_access_token
 from rabbit_mq.producer_rabbit import convert_to_audio, send_to_rabbitmq
+from fastapi.openapi.utils import get_openapi
+from fastapi.openapi.models import SecurityRequirement
 
 from database import get_session
-from schemas import UserRegistration, UserVerifyCode
-from models import ConfirmationCode, User
+from schemas import LoginRequest, RequestAudioResponse, TokenData, UserRegistration, UserRequest, UserVerifyCode
+from models import ConfirmationCode, RequestAudio, TransactionAudio, User
 from random import randint as randint
 from sqlmodel import Session, select
 from bcrypt import hashpw, gensalt, checkpw
 from dotenv import load_dotenv
+from starlette.responses import HTMLResponse
 
 from utils import how_time_has_passed, send_email
 import os
+
 
 #TODO вынсти все load_dotenv() в config.py  
 load_dotenv()
 CODE_EXPIRATION_TIME = os.getenv("CODE_EXPIRATION_TIME")
 CODE_REPEAT_RESPONSE_TIME = os.getenv("CODE_REPEAT_RESPONSE_TIME")
+AMOUT = os.getenv("AMOUT")
 
 router = APIRouter()
 
-@router.post("/register")
+@router.get("/")
+async def root():
+    file_path = os.path.join(os.path.dirname(__file__), '../public', 'register.html')
+    return HTMLResponse(open(file_path, "r").read())
+
+@router.get("/login")
+async def login():
+    return HTMLResponse(open("/login.html", "r").read())
+
+@router.get("/upload_audio")
+async def upload_audio():
+    return HTMLResponse(open("/upload_audio.html", "r").read())
+
+@router.get("/transactions")
+async def transactions():
+    return HTMLResponse(open("/transactions.html", "r").read())
+
+@router.post("/api/register")
 async def register_user(user: UserRegistration, session: Session = Depends(get_session)):
     """
     1. Проверяем, есть ли такой email в базе
@@ -98,7 +121,9 @@ async def verify_code(data: UserVerifyCode, session: Session = Depends(get_sessi
             session.add(db_user)
             session.commit()
             session.refresh(db_user)
-            return {"message": "Регистрация успешно завершена!"}
+            access_token = create_access_token(db_user.email, db_user.id)
+            
+            return {"access_token": access_token, "token_type": "bearer"}
 
     if not db_code:
         resend_code(email=data.email, session=session)
@@ -162,10 +187,17 @@ async def resend_code(data: UserVerifyCode, session: Session = Depends(get_sessi
                                 {timedelta(seconds=datetime.now())-elapsed_time} секунд назад, подождите")
 
 
-# @router.post("/login", response_model=User)
-# async def login(user: UserLogin):
+@router.post("/users/login/")
+async def login(request: LoginRequest, session: Session = Depends(get_session)):
+    user = session.exec(User).filter(User.email == request.email).first()
+    if user and checkpw(request.password.encode('utf-8'), user.password):
+        access_token = create_access_token(user.email,user.id)
+        return {"access_token": access_token, "token_type": "bearer"}
+    
+    #TODO пользователь не найден 404
+    raise HTTPException(status_code=401, detail="Invalid credentials")
 
-#     return await login_user(user)
+
 
 @router.post("/admin/create_user")
 async def create_user(user: UserRegistration, session: Session = Depends(get_session)):
@@ -176,6 +208,7 @@ async def create_user(user: UserRegistration, session: Session = Depends(get_ses
     session.commit()
     session.refresh(db_user)
     return user
+
 
 # @router.get("/balance", response_model=Transaction)
 # async def balance(current_user: User1 = Depends(get_current_user)):
@@ -189,19 +222,116 @@ async def create_user(user: UserRegistration, session: Session = Depends(get_ses
 # async def history(current_user: User1 = Depends(get_current_user)):
 #     return await get_history(current_user)
 
-@router.post("/upload_audio/")
-async def upload_audio(file: UploadFile = File(...)):
+@router.post("/audios")
+async def upload_audio(file: UploadFile = File(...), session: Session = Depends(get_session), token_data: TokenData = Depends(verify_access_token)):
     """
     Эндпоинт для загрузки файла и отправки аудио в RabbitMQ
+    Кто загружает, что за пользователь и сколько списать у него средств
     """
 
+    db_user = session.exec(select(User).where(User.user_id == token_data.id)).first()
+    if not db_user:
+        #TODO сделать перекидывание на login
+        raise HTTPException(status_code=404, detail="токен не действительный, пройдите авторизацию заново")
+    
     if not file.filename:
         raise HTTPException(status_code=400, detail="Файл не загружен")
 
-    original_format = file.filename.split('.')[-1].lower()
+    #Имя загружаемого файла
+    file_name_parts = file.split('.')
+    original_name = '.'.join(file_name_parts[:-1])
+    
+    #Перевод файла в байты 
     file_content = await file.read()
     audio_bytes = convert_to_audio(file_content, original_format)
+
+    #формат файла
+    original_format = file.filename.split('.')[-1].lower()
+
+    db_request = RequestAudio(
+                    user_id=db_user.id,
+                    file_name=original_name,
+                    created_at=datetime.now(),
+                    original_format=original_format
+                )
+
+    session.add(db_request)
+    session.commit()
+    session.refresh(db_request)
+
+    db_transation = TransactionAudio(
+        user_id=db_user.id,
+        amount=AMOUT,
+        amount_type="Списание средств",
+        create_at=datetime.now(),
+        request_id=db_request.id
+    )
+    session.add(db_transation)
+    session.commit()
+    session.refresh(db_transation)
 
     send_to_rabbitmq(audio_bytes, original_format)
 
     return {"message": "Файл успешно отправлен в RabbitMQ"}
+
+@router.get("/audios")
+async def get_list_audios(session: Session = Depends(get_session), token_data: TokenData = Depends(verify_access_token)):
+#TODO взять все запросы принадлежащие пользователю
+    db_user_requests = session.exec(select(RequestAudio).where(RequestAudio.user_id == token_data.id)).all()
+    if db_user_requests is None:
+        raise HTTPException(status_code=404, detail="У вас ещё нет транскрипции аудио-файлов")
+    request_json = {
+        RequestAudioResponse(id=_object.id, created_at=_object.created_at, file_name=_object.file_name)
+        for _object in db_user_requests
+    }
+        
+    return {"message": {request_json}}
+
+@router.get("/audios/{id}")
+async def get_audio(id: int, session: Session =Depends(get_session), token_data: TokenData = Depends(verify_access_token)):
+#TODO вернуть выбранную пользователем аудио
+    db_audio = session.exec(select(RequestAudio).where(RequestAudio.id == id, RequestAudio.user_id == token_data.id)).first()
+
+    if db_audio is None:
+        raise HTTPException(status_code=404, detail="Аудио-файл не найден")
+    
+    return {f"message: {db_audio}"}
+
+@router.get("/transactions")
+async def get_list_transactions(session: Session = Depends(get_session), token_data: TokenData = Depends(verify_access_token)):
+    # Получаем все транзакции, принадлежащие пользователю
+    db_user_transactions = session.exec(select(TransactionAudio).where(TransactionAudio.user_id == token_data.id)).all()
+
+    if not db_user_transactions:
+        raise HTTPException(status_code=404, detail="У вас ещё нет транзакций")
+
+    return {"message": db_user_transactions}
+
+@router.get("/openapi.json")
+async def openapi():
+    openapi_schema = get_openapi(
+        title="My API",
+        version="1.0.0",
+        routes=app.routes,
+    )
+    openapi_schema["components"]["securitySchemes"] = {
+        "Bearer Auth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT"
+        }
+    }
+    openapi_schema["security"] = [{"Bearer Auth": []}]
+    return openapi_schema
+
+
+
+    # id: int = Field(primary_key=True, unique=True)
+    # user_id: int = Field(index=True, foreign_key="user.id")
+    # file_name: str
+    # output_text: Optional[str]  
+    # created_at: datetime = Field(default_factory=datetime.now)
+    # transactions: List["Transaction"] = Relationship(back_populates="request")
+    # user: User = Relationship(back_populates="requests")
+    # is_success: Optional[bool] = Field(default=False)
+    # original_format: str

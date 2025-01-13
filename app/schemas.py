@@ -25,6 +25,10 @@ class UserRegistration(BaseModel):
 
     class Config:
         from_attributes = True
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
     
 class UserVerifyCode(BaseModel):
     email: EmailStr
@@ -41,5 +45,30 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class UserRequest:
+    id: int
+    user_id: int
+    file_name: str
+    output_text: str
+    created_at: datetime
+    cost: int  
+    is_success: bool
+
 class CheckEmail(BaseModel):
     email: EmailStr
+
+class RequestAudioResponse(BaseModel):
+    """
+    Нужен для подготовки данных, а именно списка аудио-тексто пользователя
+    """
+    id: int
+    created_at: datetime
+    file_name: str
+
+class TransactionAudioResponse(BaseModel):
+    id: int
+    amount: int
+    amount_type: str
+    create_at: str
+    request_id: Optional[int]

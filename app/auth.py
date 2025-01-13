@@ -24,6 +24,10 @@ def create_access_token(email: str, id: int):
     return encoded_jwt
 
 def verify_access_token(token: str = Depends(oauth2_scheme)):
+    """
+    email: str = payload.get("email")
+    id: int = payload.get("id")
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

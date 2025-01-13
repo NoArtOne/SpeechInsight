@@ -22,7 +22,6 @@ print(f"Подключение к БД: {DATABASE_URL}")
 
 engine = create_engine(DATABASE_URL, echo=True)  # echo=True для отладки SQL-запросов
 
-
 def init_db():
     """
     Функция инициализации базы данных.

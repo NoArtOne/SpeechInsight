@@ -1,80 +1,104 @@
 # version: "3.8"
 services:
-  # whisper:
-  #   build: ./whisper/
-  #   depends_on:
-  #     - rabbitmq
+  whisper:
+    build: 
+      context: ./whisper/
+      dockerfile: Dockerfile
+    environment:
+      - RABBITMQ_HOST = 'rabbitmq'
+      - RABBITMQ_QUEUE = 'audio_queue'
+      - RESULT_QUEUE = 'result_queue_1'
+      - RABBITMQ_PORT=5672 
+      - RABBITMQ_USER=guest 
+      - RABBITMQ_PASS=guest
+    depends_on:
+      db:
+        condition: service_healthy  
+      rabbitmq:
+        condition: service_healthy 
+      app:
+        condition: service_healthy 
+    ports:
+      - "8181:8181"
 
-  # app:
-  #   build: ./app/
-  #   image: event-planner-api:latest 
-  #   env_file:
-  #   - ./app/.env
-  #   volumes:
-  #     - ./app:/app
-  #   ports:
-  #     - "8080:8080"
-  #   depends_on:
-  #     - db
-  #     - rabbitmq
-  #     - bertanswer1
-  #     - bertanswer2
-
-  # web:
-  #   build: ./web/
-  #   ports:
-  #    - "5173:5173"
-  #   depends_on:
-  #    - app
+  whisper2:
+    build: 
+      context: ./whisper/
+      dockerfile: Dockerfile
+    environment:
+      - RABBITMQ_HOST = 'rabbitmq'
+      - RABBITMQ_QUEUE = 'audio_queue'
+      - RESULT_QUEUE = 'result_queue_1'
+      - RABBITMQ_PORT=5672 
+      - RABBITMQ_USER=guest 
+      - RABBITMQ_PASS=guest
+    depends_on:
+      db:
+        condition: service_healthy  
+      rabbitmq:
+        condition: service_healthy 
+      app:
+        condition: service_healthy 
+    ports:
+      - "8181:8181"
 
   db:
     image: postgres:16-alpine
     volumes:
       - ./postgres_data:/var/lib/postgresql/data/
-    #
+  
     expose:
       - 5432
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=speechinsight
+      - POSTGRES_DB=${POSTGRES_DB}
     ports: 
      - "5432:5432"
-
-  # app:
-  #   build: ./app/
-  #   image: event-planner-api:latest 
-  #   env_file:
-  #   - ./app/.env
-  #   volumes:
-  #     - ./app:/app
-  #   ports:
-  #     - "8000:8000"
-  #   depends_on:
-  #     - db
-     
-  # web:
-  #   image: python:3.11-alpine
-  #   command: sh  -c "cd speechinsight && pip install -r requirements.txt && cd app && ls && uvicorn app\main:app --host 0.0.0.0 --port 8000"
-  #   volumes:
-  #     - .:/speechinsight
-  #   ports:
-  #     - "8000:8000"
-  #   depends_on:
-  #     - db
-  #   environment:
-  #     - DB_HOST=${DB_HOST}
-  #     - DB_PORT=${DB_PORT}
-  #     - DB_USER=${DB_USER}
-  #     - DB_PASS=${DB_PASS}
-  #     - DB_NAME=${DB_NAME}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"] 
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   rabbitmq:
-      image: rabbitmq:3-management
-      ports:
-        - "5672:5672"
-        - "15672:15672"
-      environment:
-        - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
-        - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: 
+      context: ./app
+      dockerfile: Dockerfile
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASS=0000
+      - DB_NAME=speechinsight
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    depends_on:
+      db:
+        condition: service_healthy  # Убедитесь, что db готов
+      rabbitmq:
+        condition: service_healthy  # Убедитесь, что rabbitmq готов
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      
+    ports:
+      - "8000:8000"
 
