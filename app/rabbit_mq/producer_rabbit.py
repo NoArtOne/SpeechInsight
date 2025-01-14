@@ -1,4 +1,5 @@
 import io
+import logging
 import pika
 import subprocess
 import os
@@ -16,37 +17,60 @@ RESULT_QUEUE = 'result_queue_1'
 """
 
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
-RABBITMQ_QUEUE = os.getenv("RESULT_QUEUE")
+RABBITMQ_QUEUE = os.getenv("RABBITMQ_QUEUE")
 RESULT_QUEUE = os.getenv("RESULT_QUEUE")
 
-# RABBITMQ_HOST = 'localhost'
-# RABBITMQ_QUEUE = 'audio_queue'
-# RESULT_QUEUE = 'result_queue_1'
+logger = logging.getLogger(__name__)
 
 def send_to_rabbitmq(audio_bytes, original_format):
     """
     Отправляет байткод аудио и формат файла в RabbitMQ
     """
+    # connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
+    # channel = connection.channel()
+    # channel.queue_declare(queue=RABBITMQ_QUEUE)
+    # logger.info(f"НАЧАЛА СОЗДАНИЯ СООБЩЕНИИЯ")
+    # # Формируем сообщение: байткод аудио + формат файла
+    # message = {
+    #     "audio_bytes": audio_bytes.hex(),  # Преобразуем байты в hex-строку для JSON
+    #     "original_format": original_format
+    # }
+    # logger.info(f"message:{message}")
+    # # Конвертируем сообщение в JSON и отправляем
+    # channel.basic_publish(
+    #     exchange='',
+    #     routing_key=RABBITMQ_QUEUE,
+    #     body=json.dumps(message).encode('utf-8'),
+    #     # properties=pika.BasicProperties(
+    #     #     delivery_mode=2,  # Сделать сообщение устойчивым
+    #     # )
+    # )
+    # logger.info(f"СООБЩЕНИЕ ОТПРАВЛЕНО")
+    # # connection.close()
+
+    # connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
     connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
-    channel = connection.channel()
-    channel.queue_declare(queue=RABBITMQ_QUEUE)
+    try:
+        channel = connection.channel()
+        channel.queue_declare(queue=RABBITMQ_QUEUE)
+        logger.info(f"НАЧАЛА СОЗДАНИЯ СООБЩЕНИИЯ")
 
-    # Формируем сообщение: байткод аудио + формат файла
-    message = {
-        "audio_bytes": audio_bytes.hex(),  # Преобразуем байты в hex-строку для JSON
-        "original_format": original_format
-    }
-
-    # Конвертируем сообщение в JSON и отправляем
-    channel.basic_publish(
-        exchange='',
-        routing_key=RABBITMQ_QUEUE,
-        body=json.dumps(message).encode('utf-8'),
-        properties=pika.BasicProperties(
-            delivery_mode=2,  # Сделать сообщение устойчивым
+        message = {
+            "audio_bytes": audio_bytes.hex(),  # Преобразуем байты в hex-строку для JSON
+            "original_format": original_format
+        }
+        logger.info(f"message:Обработка байтов")
+        channel.basic_publish(
+            exchange='',
+            routing_key=RABBITMQ_QUEUE,
+            body=json.dumps(message).encode('utf-8'),
         )
-    )
-    connection.close()
+        logger.info(f"СООБЩЕНИЕ ОТПРАВЛЕНО")
+    except Exception as e:
+        logger.error(f"Error sending message: {e}")
+    finally:
+        if connection:
+            connection.close()
 
 def convert_to_audio(file: bytes, original_format: str) -> bytes:
     """

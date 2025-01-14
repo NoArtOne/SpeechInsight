@@ -7,7 +7,7 @@
 
 <body>
     <h1>Upload Audio</h1>
-    <form onsubmit="upload_audio(event)" enctype="multipart/form-data">
+    <form id="uploadForm" onsubmit="upload_audio(event)" enctype="multipart/form-data">
         <input type="file" name="file" accept=".mp3,.wav" required> <br><br>
         <input type="submit" value="Upload">
     </form>
@@ -19,7 +19,8 @@
     function upload_audio(event) {
         event.preventDefault();
 
-        // const formData = new FormData(document.getElementById('verifyForm'));
+        const form = document.getElementById('uploadForm'); // Get the form element by its ID
+        const formData = new FormData(form); // Create FormData object from the form
 
         fetch("/api/audios", {
             method: 'POST',
@@ -30,14 +31,17 @@
         })
             .then(response => {
                 if (response.ok) {
-                    alert("Аудио успешно загружено")
+                    alert("Аудио успешно загружено");
                 }
                 else {
-                    alert("Аудио загрузилось с ошибкой" + response.error)
+                    return response.json().then(err => { // Parse JSON error response
+                        throw new Error(err.detail || 'Ошибка загрузки аудио');
+                    });
                 }
-
-            }
-
-            );
+            })
+            .catch(error => { // Catch errors from fetch and JSON parsing
+                alert("Аудио загрузилось с ошибкой: " + error.message);
+                console.error("Upload error:", error); // Log error to console for debugging
+            });
     };
 </script>

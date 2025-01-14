@@ -31,12 +31,13 @@ def init_db():
     """
     if not database_exists(engine.url):
         create_database(engine.url)
+        SQLModel.metadata.create_all(bind=engine)
         print("Новая база данных создана!")
     else:
         print("База данных уже существует.")
 
-    SQLModel.metadata.drop_all(bind=engine)
-    SQLModel.metadata.create_all(bind=engine)
+    # SQLModel.metadata.drop_all(bind=engine)
+    # SQLModel.metadata.create_all(bind=engine)
     print("Таблицы успешно пересозданы.")
 
 

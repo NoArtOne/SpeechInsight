@@ -52,7 +52,7 @@ class TransactionAudio(SQLModel, table=True):
     amount: int  
     amount_type: str  
     create_at: datetime = Field(default_factory=datetime.now)
-    user: User = Relationship(back_populates="transactions")
+    user: Optional[User] = Relationship(back_populates="transactions")
     request_id: Optional[int] = Field(foreign_key="requestaudio.id", nullable=True)
     request: Optional["RequestAudio"] = Relationship(back_populates="transactions")
 
@@ -70,5 +70,5 @@ class RequestAudio(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     is_success: Optional[bool] = Field(default=False)
     original_format: str
-    transactions: List["TransactionAudio"] = Relationship(back_populates="request", cascade_delete=True)
-    user: User = Relationship(back_populates="requests")
+    transactions: Optional[List["TransactionAudio"]] = Relationship(back_populates="request", cascade_delete=True)
+    user: Optional[User] = Relationship(back_populates="requests")

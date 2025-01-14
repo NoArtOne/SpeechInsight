@@ -325,53 +325,59 @@ async def upload_audio(
     Эндпоинт для загрузки файла и отправки аудио в RabbitMQ.
     Кто загружает, что за пользователь и сколько списать у него средств.
     """
+    logger.info(f"Начало функции")
+    try:
+        db_user = session.exec(select(User).where(User.id == token_data.id)).first()
+        if not db_user:
+            raise HTTPException(
+                status_code=404, detail="Токен не действительный, пройдите авторизацию заново"
+            )
+        logger.info(f"db_user:{db_user}")
 
-    db_user = session.exec(select(User).where(User.id == token_data.id)).first()
-    if not db_user:
-        raise HTTPException(
-            status_code=404, detail="Токен не действительный, пройдите авторизацию заново"
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Файл не загружен")
+
+
+        original_name, original_format = os.path.splitext(file.filename)
+        original_format = original_format.lstrip(".").lower()
+        file_content = await file.read()
+        audio_bytes = convert_to_audio(file_content, original_format)
+        logger.info(f"original_name:{original_name}")
+        db_request = RequestAudio(
+            user_id=db_user.id,
+            file_name=original_name,
+            created_at=datetime.now(),
+            original_format=original_format,
         )
+        logger.info(f"db_request:{db_request}")
+        session.add(db_request)
+        session.commit()
+        session.refresh(db_request)
 
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Файл не загружен")
+        if db_user.balance < AMOUNT:
+            raise HTTPException(status_code=402, detail="Недостаточно средств на балансе")
+        logger.info(f"Начала создания транзакции")
+        db_transaction = TransactionAudio(
+            user_id=db_user.id,
+            amount=AMOUNT,
+            amount_type="Списание средств",
+            created_at=datetime.now(),
+            request_id=db_request.id,
+        )
+        logger.info(f"db_transaction:{db_transaction}")
 
-    original_name, original_format = os.path.splitext(file.filename)
-    original_format = original_format.lstrip(".").lower()
-    file_content = await file.read()
-    audio_bytes = convert_to_audio(file_content, original_format)
+        db_user.balance -= AMOUNT 
 
-    db_request = RequestAudio(
-        user_id=db_user.id,
-        file_name=original_name,
-        created_at=datetime.now(),
-        original_format=original_format,
-    )
+        session.add(db_transaction)
+        session.add(db_user) 
+        session.commit()
+        session.refresh(db_transaction)
+        send_to_rabbitmq(audio_bytes, original_format)
+    
 
-    session.add(db_request)
-    session.commit()
-    session.refresh(db_request)
-
-    if db_user.balance < AMOUNT:
-        raise HTTPException(status_code=402, detail="Недостаточно средств на балансе")
-
-    db_transaction = TransactionAudio(
-        user_id=db_user.id,
-        amount=AMOUNT,
-        amount_type="Списание средств",
-        created_at=datetime.now(),
-        request_id=db_request.id,
-    )
-
-    db_user.balance -= AMOUNT 
-
-    session.add(db_transaction)
-    session.add(db_user) 
-    session.commit()
-    session.refresh(db_transaction)
-
-    send_to_rabbitmq(audio_bytes, original_format)
-
-    return {"message": "Файл успешно отправлен в RabbitMQ"}
+        return {"message": "Файл успешно отправлен в RabbitMQ"}
+    except Exception as inst:
+        logger.info(f"{Exception( exc_info=True)}")
 
 @router.get("/api/audios", response_model=list[RequestAudioResponse])
 async def get_list_audios(
