@@ -105,27 +105,29 @@ async def login_page():
         return HTMLResponse(f.read())
 
 @router.get("/upload_audio", response_class=HTMLResponse)
-async def upload_audio_page(request: Request, token_data: TokenData = Depends(verify_access_token)):
+async def upload_audio_page(request: Request):
     return templates.TemplateResponse("upload_audio.html", {"request": request})
 
 @router.get("/user_profile", response_class=HTMLResponse)
-async def user_profile_page(request: Request, token_data: TokenData = Depends(verify_access_token)):
-     return templates.TemplateResponse("user_profile.html", {"request": request})
+async def user_profile_page():
+    file_path = os.path.join(os.path.dirname(__file__), "../public", "user_profile.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
 @router.get("/top_up", response_class=HTMLResponse)
-async def top_up_page(request: Request, token_data: TokenData = Depends(verify_access_token)):
+async def top_up_page(request: Request):
     return templates.TemplateResponse("top_up.html", {"request": request})
 
 @router.get("/transactions_page", response_class=HTMLResponse) 
-async def transactions_page_route(request: Request, token_data: TokenData = Depends(verify_access_token)):
+async def transactions_page_route(request: Request):
     return templates.TemplateResponse("transactions.html", {"request": request})
 
 @router.get("/audios_page", response_class=HTMLResponse) 
-async def audios_page_route(request: Request, token_data: TokenData = Depends(verify_access_token)):
+async def audios_page_route(request: Request):
     return templates.TemplateResponse("audios.html", {"request": request})
 
 @router.get("/audios_page/{id}", response_class=HTMLResponse)
-async def audio_detail_page(request: Request, id: int, token_data: TokenData = Depends(verify_access_token)):
+async def audio_detail_page(request: Request, id: int):
     return templates.TemplateResponse("audio_detail.html", {"request": request, "audio_id": id})
 
 # --- API Endpoints ---
@@ -313,7 +315,7 @@ async def top_up_balance(
     session.refresh(db_user)
     return {"message": f"Баланс успешно пополнен на {AMOUNT}", "new_balance": db_user.balance}
 
-@router.post("/audios")
+@router.post("/api/audios")
 async def upload_audio(
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
@@ -333,10 +335,8 @@ async def upload_audio(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Файл не загружен")
 
-    # Имя загружаемого файла
     original_name, original_format = os.path.splitext(file.filename)
     original_format = original_format.lstrip(".").lower()
-    # Перевод файла в байты
     file_content = await file.read()
     audio_bytes = convert_to_audio(file_content, original_format)
 
@@ -373,7 +373,7 @@ async def upload_audio(
 
     return {"message": "Файл успешно отправлен в RabbitMQ"}
 
-@router.get("/audios", response_model=list[RequestAudioResponse])
+@router.get("/api/audios", response_model=list[RequestAudioResponse])
 async def get_list_audios(
     session: Session = Depends(get_session), token_data: TokenData = Depends(verify_access_token)
 ):
@@ -385,7 +385,7 @@ async def get_list_audios(
 
     return db_user_requests
 
-@router.get("/audios/{id}", response_model=RequestAudioResponse)
+@router.get("/api/audios/{id}", response_model=RequestAudioResponse)
 async def get_audio(
     id: int,
     session: Session = Depends(get_session),
@@ -402,7 +402,7 @@ async def get_audio(
 
     return db_audio
 
-@router.get("/transactions", response_model=list[TransactionAudioResponse])
+@router.get("/api/transactions", response_model=list[TransactionAudioResponse])
 async def get_list_transactions(
     session: Session = Depends(get_session),
     token_data: TokenData = Depends(verify_access_token),

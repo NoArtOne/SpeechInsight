@@ -6,25 +6,24 @@
 <body>
     <h1>User Profile</h1>
     <p><a href="/audios_page">Мои аудиозаписи</a></p>
-    <p><a href="/transactions_page">View Transactions</a></p>
-    <p><a href="/top_up">Top Up Balance</a></p>
-    <p><a href="/upload_audio">Upload Audio</a></p>
+    <p><a href="/transactions_page">Мои транзакции</a></p>
+    <p><a href="/top_up">Пополнить баланс</a></p>
+    <p><a href="/upload_audio">Загрузка новой аудиозаписи</a></p>
 
-    <!-- Display user information (using Jinja2) -->
     <div id="user-info">
-        <!-- User data will be loaded here -->
     </div>
      <script>
-        // Fetch user data and populate the #user-info div
+        console.log("access_token", localStorage.getItem("access_token"))
         fetch('/api/users/me', 
+            
             {
                 headers: {
-                    Authentication: 'твой токен'
+                    Authorization: `Bearer ${localStorage.getItem("access_token")}`
                 }
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('Network response was not ok: ' + response.statusText);
+                    throw new Error('Network response fail: ' + response.statusText);
                 }
                 return response.json();
             })

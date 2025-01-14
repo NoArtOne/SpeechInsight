@@ -5,27 +5,28 @@
 </head>
 <body>
     <h1>Подтверждение регистрации</h1>
-    <form id="verifyCodeForm" onsubmit="verify_code" action="/api/register/verify_code" method="post">
+    <!-- Добавляем id к форме и onsubmit обработчик -->
+    <form id="verifyForm" onsubmit="verify_code(event)">
         <label for="email">Ваш Email:</label>
         <input type="email" id="email" name="email" required><br><br>
 
         <label for="code">Код подтверждения:</label>
         <input type="text" id="code" name="code" required><br><br>
 
+        <!-- Убираем onclick с кнопки, так как используем onsubmit формы -->
         <button type="submit">Подтвердить</button>
     </form>
     <p id="error-message" style="color: red;"></p>
-    <!-- <p>Не получили код? <a href="/api/register/resend_code">Повторно отправить код</a></p> -->
+    <p>Не получили код? <a href="/api/register/resend_code">Повторно отправить код</a></p>
 
     <script>
             function verify_code(event) {
                 event.preventDefault();
+                
+                // Создаем FormData из формы
+                const formData = new FormData(document.getElementById('verifyForm'));
 
-                const form = event.target;
-                console.log("form", form)
-                const formData = new FormData(form);
-
-                fetch(form.action, {
+                fetch("/api/register/verify_code", {
                     method: 'POST',
                     body: formData
                 })
@@ -34,8 +35,7 @@
                         if (response.ok) {
                             return response.json()
                         }
-                        throw new Error(err.detail || 'Ошибка верификации кода');
-
+                        throw new Error('Ошибка верификации кода');
                     })
                     .then(data => {
                         console.log("data", data)
