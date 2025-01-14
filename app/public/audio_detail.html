@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Detail</title>
+</head>
+<body>
+    <h1>Audio Detail</h1>
+    <div id="audio-details">
+        <!-- Audio details will be loaded here -->
+    </div>
+        <p><a href="/audios_page">Back to My Audios</a></p>
+
+     <script>
+    // Get the audio ID from the URL
+    const audioId = window.location.pathname.split('/').pop();
+
+    // Fetch audio details
+    fetch(`/audios/${audioId}`)
+      .then(response => response.json())
+      .then(audio => {
+        const audioDetailsDiv = document.getElementById('audio-details');
+        // Display the audio information
+        audioDetailsDiv.innerHTML = `
+          <p>File Name: ${audio.file_name}</p>
+          <p>Uploaded: ${audio.created_at}</p>
+          <p>Format: ${audio.original_format}</p>
+          <!-- Add more details as needed -->
+        `;
+
+        // If you have output_text, display it:
+        if (audio.output_text) {
+            audioDetailsDiv.innerHTML += `<p>Transcription: ${audio.output_text}</p>`;
+        }
+
+      })
+      .catch(error => console.error('Error fetching audio details:', error));
+  </script>
+</body>
+</html>

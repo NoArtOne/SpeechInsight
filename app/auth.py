@@ -1,3 +1,4 @@
+import logging
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -5,12 +6,14 @@ import os
 from datetime import timedelta, datetime
 from typing import Optional
 from starlette import status
-
+from dotenv import load_dotenv
 #Локальные импорты
 from schemas import TokenData
+load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
+logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -20,6 +23,7 @@ def create_access_token(email: str, id: int):
     to_encode = data.copy()
     expire = datetime.now() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
+    logger.info(f"SECRET_KEY:{SECRET_KEY},ALGORITHM:{ALGORITHM}")
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 

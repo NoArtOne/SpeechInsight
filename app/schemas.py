@@ -21,20 +21,6 @@ class UserRegistration(BaseModel):
     email: EmailStr
     password: str
 
-    @validator("password")
-    def password_strength(cls, v):
-        if len(v) < 7:
-            raise ValueError("Password must be at least 7 characters long")
-        if not any(char.isdigit() for char in v):
-            raise ValueError("Password must contain at least one digit")
-        if not any(char.isalpha() for char in v):
-            raise ValueError("Password must contain at least one letter")
-        if not any(char in "!@#$%^&*()" for char in v):
-            raise ValueError("Password must contain at least one special character")
-        return v
-    class Config:
-        from_attributes = True
-
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import aio_pika
 from fastapi import FastAPI
@@ -10,6 +11,10 @@ app = FastAPI()
 
 # Подключаем роутеры
 app.include_router(router)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 async def check_rabbitmq_ready():
     connection = None

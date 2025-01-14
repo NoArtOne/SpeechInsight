@@ -1,16 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Загрузка аудио</title>
+    <title>Upload Audio</title>
 </head>
 <body>
-    <h1>Загрузка аудио для транскрипции</h1>
+    <h1>Upload Audio</h1>
     <form action="/audios" method="post" enctype="multipart/form-data">
-        <label for="audio_file">Выберите аудио-файл:</label>
-        <input type="file" id="audio_file" name="file" accept="audio/*" required><br><br>
-        <button type="submit">Загрузить и обработать</button>
+        <input type="file" name="file" accept=".mp3,.wav,.ogg,.flac" required> <br><br>
+        <input type="submit" value="Upload">
     </form>
+    <p><a href="/user_profile">Back to Profile</a></p>
 </body>
 </html>

@@ -1,24 +1,19 @@
-"""
-Контроллер получает запросы от клиента, использует схемы для валидации данных, взаимодействует
-с моделями для выполнения операций с базой данных и возвращает ответ клиенту
-"""
-
 from datetime import datetime, timedelta
+import logging
 from fastapi import (
     APIRouter,
     Depends,
+    Form,
     HTTPException,
     Request,
     FastAPI,
     File,
     UploadFile
 )
-from pydantic import EmailStr
+from fastapi.templating import Jinja2Templates
 from auth import create_access_token, verify_access_token
 from rabbit_mq.producer_rabbit import convert_to_audio, send_to_rabbitmq
 from fastapi.openapi.utils import get_openapi
-# from fastapi.openapi.models import SecurityRequirement
-
 from database import get_session
 from schemas import (
     LoginRequest,
@@ -36,74 +31,145 @@ from models import (
     TransactionAudio, 
     User
 )
-from random import randint as randint
+from random import randint
 from sqlmodel import Session, select
 from bcrypt import hashpw, gensalt, checkpw
 from dotenv import load_dotenv
-from starlette.responses import HTMLResponse
-
+from starlette.responses import HTMLResponse, RedirectResponse
 from utils import how_time_has_passed, send_email
 import os
 
 load_dotenv()
-CODE_EXPIRATION_TIME = os.getenv("CODE_EXPIRATION_TIME")
-CODE_REPEAT_RESPONSE_TIME = os.getenv("CODE_REPEAT_RESPONSE_TIME")
-AMOUT = os.getenv("AMOUT")
+CODE_EXPIRATION_TIME = int(os.getenv("CODE_EXPIRATION_TIME", 30))  # В минутах
+CODE_REPEAT_RESPONSE_TIME = int(os.getenv("CODE_REPEAT_RESPONSE_TIME", 30))  # В секундах
+AMOUNT = int(os.getenv("AMOUNT", 100))  # Поправил опечатку AMOUT -> AMOUNT
 
 router = APIRouter()
 
-@router.get("/")
-async def root():
+templates = Jinja2Templates(directory="public")
+
+logger = logging.getLogger(__name__)
+
+# --- Вспомогательная функция для переотправки кода по email ---
+def resend_code_email(email: str, session: Session):
+    """
+    Функция для повторной отправки кода подтверждения.
+    """
+    db_user = session.exec(select(User).where(User.email == email)).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    # Создаём или обновляем код подтверждения
+    confirmation_code = str(randint(1000, 9999))
+    expires_at = datetime.now() + timedelta(minutes=CODE_EXPIRATION_TIME)
+
+    db_code = session.exec(select(ConfirmationCode).where(ConfirmationCode.user_id == db_user.id)).first()
+    if db_code:
+        db_code.code = confirmation_code
+        db_code.expires_at = expires_at
+    else:
+        db_code = ConfirmationCode(
+            user_id=db_user.id,
+            code=confirmation_code,
+            expires_at=expires_at
+        )
+        session.add(db_code)
+    
+    session.commit()
+    session.refresh(db_code)
+    
+    send_email(
+        dest_email=db_user.email, 
+        subject_text="Новый код подтверждения регистрации в сервисе SpeechInsight",
+        email_text=f"Ваш новый код подтверждения: {confirmation_code}"
+    )
+
+# --- HTML Endpoints ---
+
+@router.get("/", response_class=HTMLResponse)
+async def read_root():
     file_path = os.path.join(os.path.dirname(__file__), "../public", "register.html")
-    return HTMLResponse(open(file_path, "r").read())
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
+@router.get("/verify_code", response_class=HTMLResponse)
+async def verify_code_page(request: Request):
+    file_path = os.path.join(os.path.dirname(__file__), "../public", "verify_code.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
-@router.get("/login")
-async def login():
+@router.get("/login", response_class=HTMLResponse)
+async def login_page():
     file_path = os.path.join(os.path.dirname(__file__), "../public", "login.html")
-    return HTMLResponse(open(file_path, "r").read())
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
+@router.get("/upload_audio", response_class=HTMLResponse)
+async def upload_audio_page(request: Request, token_data: TokenData = Depends(verify_access_token)):
+    return templates.TemplateResponse("upload_audio.html", {"request": request})
 
-@router.get("/upload_audio")
-async def upload_audio():
-    file_path = os.path.join(os.path.dirname(__file__), "../public", "upload_audio.html")
-    return HTMLResponse(open(file_path, "r").read())
+@router.get("/user_profile", response_class=HTMLResponse)
+async def user_profile_page(request: Request, token_data: TokenData = Depends(verify_access_token)):
+     return templates.TemplateResponse("user_profile.html", {"request": request})
 
+@router.get("/top_up", response_class=HTMLResponse)
+async def top_up_page(request: Request, token_data: TokenData = Depends(verify_access_token)):
+    return templates.TemplateResponse("top_up.html", {"request": request})
 
-@router.get("/transactions")
-async def transactions():
-    file_path = os.path.join(os.path.dirname(__file__), "../public", "transactions.html")
-    return HTMLResponse(open(file_path, "r").read())
+@router.get("/transactions_page", response_class=HTMLResponse) 
+async def transactions_page_route(request: Request, token_data: TokenData = Depends(verify_access_token)):
+    return templates.TemplateResponse("transactions.html", {"request": request})
+
+@router.get("/audios_page", response_class=HTMLResponse) 
+async def audios_page_route(request: Request, token_data: TokenData = Depends(verify_access_token)):
+    return templates.TemplateResponse("audios.html", {"request": request})
+
+@router.get("/audios_page/{id}", response_class=HTMLResponse)
+async def audio_detail_page(request: Request, id: int, token_data: TokenData = Depends(verify_access_token)):
+    return templates.TemplateResponse("audio_detail.html", {"request": request, "audio_id": id})
+
+# --- API Endpoints ---
 
 @router.post("/api/register")
-async def register_user(user: UserRegistration, session: Session = Depends(get_session)):
+async def register_user(
+    email: str = Form(...),
+    password: str = Form(...),
+    session: Session = Depends(get_session)
+):
+    user = UserRegistration(email=email, password=password)
     """
     1. Проверяем, есть ли такой email в базе
     2. Создаём 4-значный код подтверждения
     3. Отправляем код на email
     4. Сохраняем код в БД
     """
-    #Исключили из повторной регистрации забаненных по такому адресу и активных
     existing_user = session.exec(select(User).where(User.email == user.email)).first()
     if (
-        existing_user and existing_user.status == "banned"
-        or existing_user and existing_user.status == "active"):
+        (existing_user and existing_user.status == "banned") or
+        (existing_user and existing_user.status == "active")
+    ):
         raise HTTPException(status_code=400, detail="Пользователь с таким email уже зарегистрирован")
     
-    #Для облегчения удаляем тех, кто не активировался до конца и идем дальше по процессу регистрации
+    # Удаляем пользователя со статусом "disable"
     if existing_user and existing_user.status == "disable":
         session.delete(existing_user)
         session.commit()
 
+    # Генерируем код подтверждения
     confirmation_code = str(randint(1000, 9999))
 
+    # Хешируем пароль
     hashed_password = hashpw(user.password.encode('utf-8'), gensalt())
+
+    logger.info(f"User registered with email: {email}")
     db_user = User(email=user.email, password=hashed_password)
+    logger.info(f"db_user: {db_user}")
     session.add(db_user)
     session.commit()
     session.refresh(db_user)
 
-    expires_at = datetime.now() + timedelta(minutes=int(CODE_EXPIRATION_TIME))
+    # Создаём запись подтверждения
+    expires_at = datetime.now() + timedelta(minutes=CODE_EXPIRATION_TIME)
     db_code = ConfirmationCode(
         user_id=db_user.id,
         code=confirmation_code,
@@ -113,136 +179,114 @@ async def register_user(user: UserRegistration, session: Session = Depends(get_s
     session.commit()
     session.refresh(db_code)
     
+    # Отправляем код на email
     send_email(
-        dest_email=user.email, 
+        dest_email=db_user.email, 
         subject_text="Код подтверждения регистрации в сервисе SpeechInsight",
         email_text=f'Ваш код подтверждения: {confirmation_code}'
     )
-    return f"message: Код подтверждения отправлен на почту пользователя {user}, {confirmation_code}"
+    
+    # Перенаправляем на страницу ввода кода подтверждения
+    return RedirectResponse(url="/verify_code", status_code=303)
 
 @router.post("/api/register/verify_code")
-async def verify_code(data: UserVerifyCode, session: Session = Depends(get_session)):
+async def verify_code(
+    email: str = Form(...),
+    code: str = Form(...),
+    session: Session = Depends(get_session)
+):
     """
     1. Проверяем, есть ли код в базе
     2. Проверяем, совпадает ли код и не истёк ли он
-        2.1. Если код истёк, он авт. перезапрашивается
+        2.1. Если код истёк, он автоматически перезапрашивается
     3. Если всё ок – удаляем код из базы и завершаем регистрацию
     """
-    db_user = session.exec(select(User).where(User.email == data.email)).first()
+    db_user = session.exec(select(User).where(User.email == email)).first()
     if not db_user:
         print("Пользователь не найден")
         raise HTTPException(
             status_code=404,
-            detail="Что-то пошло не так. Попробуйте зарегистрироваться ещё раз позднее!"
-            )
+            detail="Что-то пошло не так. Попробуйте зарегистрироваться ещё раз позже!"
+        )
     db_code = session.exec(select(ConfirmationCode).where(ConfirmationCode.user_id == db_user.id)).first()
 
     if db_code:
-        is_expired, elapsed_time = how_time_has_passed(db_code.create_at, CODE_EXPIRATION_TIME)
-        if is_expired==True:
-            resend_code(data=data.email, session=session)
-            #TODO print("Реализовать устаревание и удаление кода авторизации") celory
+        is_expired, elapsed_time = how_time_has_passed(db_code.create_at, CODE_EXPIRATION_TIME * 60)  # Преобразуем минуты в секунды
+        if is_expired:
+            resend_code_email(email, session)
             session.delete(db_code)
             session.commit()
-            session.refresh()
-
             raise HTTPException(
                 status_code=404, 
-                detail="Код подтверждения устарел, прошло более 30 минут. \
-                    На вашу почту отправлен новый код авторизации")
-        elif is_expired==False:
+                detail="Код подтверждения устарел. Новый код отправлен на вашу почту."
+            )
+        elif db_code.code != code:
+            raise HTTPException(status_code=400, detail="Неверный код подтверждения. Попробуйте ещё раз или запросите новый код.")
+        else:
+            db_user.status = "active"
             session.delete(db_code)
             session.commit()
-            db_user = ConfirmationCode(status="activate")
-            session.add(db_user)
-            session.commit()
-            session.refresh(db_user)
+
             access_token = create_access_token(db_user.email, db_user.id)
             
-            return {"access_token": access_token, "token_type": "bearer"}
+            return {"access_token": access_token, "token_type": "bearer", "redirect_url": "/user_profile"}
 
-    if not db_code:
-        resend_code(data=data.email, session=session)
-        raise HTTPException(status_code=408, detail="Код подтверждения устарел, на вашу почту отправлен \
-                            новый код")
 
-    if db_code.code != data.code:
-        raise HTTPException(status_code=400, detail="Неверный код подтверждения. Попробуйте ещё раз или \
-                            запросить код повторно")
+    # Если кода нет, перенаправляем на повторную отправку
+    resend_code_email(email, session)
+    raise HTTPException(status_code=408, detail="Код подтверждения отсутствует. Новый код отправлен на вашу почту.")
 
- 
 @router.post("/api/register/resend_code")
-async def resend_code(data: UserVerifyCode, session: Session = Depends(get_session)):
+async def resend_code(
+    email: str = Form(...),
+    session: Session = Depends(get_session)
+):
     """
     1. Проверяем, есть ли пользователь
     2. Если код ещё не истёк – не отправляем новый
     3. Если истёк – создаём новый и отправляем
     """
-    db_user = session.exec(select(User).where(User.email == data.email)).first()
+    db_user = session.exec(select(User).where(User.email == email)).first()
     if not db_user:
         print("Пользователь не найден")
-        raise HTTPException(status_code=404,
-                            detail="Что-то пошло не так. Попробуйте зарегистрироваться ещё раз позднее!")
-
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
     db_code = session.exec(select(ConfirmationCode).where(ConfirmationCode.user_id == db_user.id)).first()
     if db_code:
         is_expired, elapsed_time = how_time_has_passed(db_code.create_at, CODE_REPEAT_RESPONSE_TIME)
-        if is_expired==True:
-            new_code = str(randint(1000, 9999))
-
-            if db_code:
-                db_code.code = new_code
-                db_code.expires_at = datetime.now() + CODE_EXPIRATION_TIME
-            else:
-                db_code = ConfirmationCode(
-                    user_id=db_user.id,
-                    code=new_code,
-                    expires_at=datetime.now() + CODE_EXPIRATION_TIME
-                )
-
-            session.add(db_code)
-            session.commit()
-
-            send_email(
-            dest_email=data.email,
-            subject="Новый код подтверждения",
-            email_text=f"Ваш новый код подтверждения: {new_code}"
-            )
-            return {
-                f"message: Код подтверждения успешно отправлен на вашу почту отправлен новый код \
-                    авторизации, новый код вы сможете запросить через 30 секунд"
-                }
-        
-        elif is_expired==False:
-            raise HTTPException(status_code=425, detail=f"Вы запрашивали код авторизации \
-                                {timedelta(seconds=datetime.now())-elapsed_time} секунд назад, подождите")
-
+        if is_expired:
+            # Переотправляем код
+            resend_code_email(email, session)
+            return {"message": "Код подтверждения успешно отправлен на вашу почту. Новый код вы сможете запросить через 30 секунд."}
+        else:
+            # Вычисляем, сколько времени осталось до следующего запроса
+            remaining_time = CODE_REPEAT_RESPONSE_TIME - int(elapsed_time.total_seconds())
+            raise HTTPException(status_code=425, detail=f"Вы запрашивали код авторизации {int(elapsed_time.total_seconds())} секунд назад, подождите {max(remaining_time, 1)} секунд.")
+    else:
+        # Если кода нет, создаём и отправляем новый
+        resend_code_email(email, session)
+        return {"message": "Код подтверждения успешно отправлен на вашу почту."}
 
 @router.post("/api/users/login/")
 async def login(request: LoginRequest, session: Session = Depends(get_session)):
-    user = session.exec(select(User).filter(User.email == request.email)).first()
-    if user and checkpw(request.password.encode('utf-8'), user.password.encode("utf-8")):
-        access_token = create_access_token(user.email,user.id)
+    user = session.exec(select(User).where(User.email == request.email)).first()
+    if user and checkpw(request.password.encode('utf-8'), user.password):
+        access_token = create_access_token(user.email, user.id)
         return {"access_token": access_token, "token_type": "bearer"}
-    
-    #TODO пользователь не найден 404
-    raise HTTPException(status_code=401, detail="Invalid credentials")
+    else:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-@router.get("/users/me", response_model=UserResponse)
+@router.get("/api/users/me", response_model=UserResponse)
 async def get_user_data(
     token_data: TokenData = Depends(verify_access_token),
     session: Session = Depends(get_session),
 ):
-    """
-    Endpoint для получения данных пользователя.
-    """
     db_user = session.exec(select(User).where(User.id == token_data.id)).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     return db_user
 
-
-@router.post("/users/top_up")
+@router.post("/api/users/top_up")
 async def top_up_balance(
     token_data: TokenData = Depends(verify_access_token),
     session: Session = Depends(get_session),
@@ -254,21 +298,20 @@ async def top_up_balance(
     if not db_user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    db_user.balance += int(AMOUT)
+    db_user.balance += AMOUNT
     session.add(db_user)
 
-    # Create a transaction record
+    # Создаём запись транзакции
     transaction = TransactionAudio(
         user_id=db_user.id,
-        amount=int(AMOUT),
+        amount=AMOUNT,
         amount_type="Пополнение баланса",
         created_at=datetime.now(),
     )
     session.add(transaction)
     session.commit()
     session.refresh(db_user)
-    return {"message": f"Баланс успешно пополнен на {AMOUT}", "new_balance": db_user.balance}
-
+    return {"message": f"Баланс успешно пополнен на {AMOUNT}", "new_balance": db_user.balance}
 
 @router.post("/audios")
 async def upload_audio(
@@ -277,8 +320,8 @@ async def upload_audio(
     token_data: TokenData = Depends(verify_access_token),
 ):
     """
-    Эндпоинт для загрузки файла и отправки аудио в RabbitMQ
-    Кто загружает, что за пользователь и сколько списать у него средств
+    Эндпоинт для загрузки файла и отправки аудио в RabbitMQ.
+    Кто загружает, что за пользователь и сколько списать у него средств.
     """
 
     db_user = session.exec(select(User).where(User.id == token_data.id)).first()
@@ -308,26 +351,23 @@ async def upload_audio(
     session.commit()
     session.refresh(db_request)
 
-    if db_user.balance < int(AMOUT):
+    if db_user.balance < AMOUNT:
         raise HTTPException(status_code=402, detail="Недостаточно средств на балансе")
-
 
     db_transaction = TransactionAudio(
         user_id=db_user.id,
-        amount=int(AMOUT),
+        amount=AMOUNT,
         amount_type="Списание средств",
         created_at=datetime.now(),
         request_id=db_request.id,
     )
 
-    db_user.balance -= int(AMOUT) 
+    db_user.balance -= AMOUNT 
 
     session.add(db_transaction)
     session.add(db_user) 
     session.commit()
     session.refresh(db_transaction)
-
-
 
     send_to_rabbitmq(audio_bytes, original_format)
 
@@ -344,7 +384,6 @@ async def get_list_audios(
         raise HTTPException(status_code=404, detail="У вас ещё нет транскрипции аудио-файлов")
 
     return db_user_requests
-        
 
 @router.get("/audios/{id}", response_model=RequestAudioResponse)
 async def get_audio(

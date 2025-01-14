@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Audios</title>
+</head>
+<body>
+    <h1>My Audios</h1>
+    <ul id="audio-list">
+        <!-- Audio list will be loaded here -->
+    </ul>
+     <p><a href="/user_profile">Back to Profile</a></p>
+    <script>
+    fetch('/audios')
+      .then(response => response.json())
+      .then(data => {
+        const audioList = document.getElementById('audio-list');
+          // Check if the data.message exists and is an array.
+        if (data.message && Array.isArray(data.message)) {
+            data.message.forEach(audio => {
+              const listItem = document.createElement('li');
+              const link = document.createElement('a');
+              link.href = `/audios_page/${audio.id}`; // Link to detail page
+              link.textContent = `${audio.file_name} (Uploaded: ${audio.created_at})`;
+              listItem.appendChild(link);
+              audioList.appendChild(listItem);
+            });
+        } else {
+            audioList.innerHTML = '<li>No audio files found.</li>';
+        }
+
+      })
+      .catch(error => console.error('Error fetching audios:', error));
+  </script>
+</body>
+</html>

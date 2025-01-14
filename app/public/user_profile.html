@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Profile</title>
+</head>
+<body>
+    <h1>User Profile</h1>
+    <p><a href="/audios_page">Мои аудиозаписи</a></p>
+    <p><a href="/transactions_page">View Transactions</a></p>
+    <p><a href="/top_up">Top Up Balance</a></p>
+    <p><a href="/upload_audio">Upload Audio</a></p>
+
+    <!-- Display user information (using Jinja2) -->
+    <div id="user-info">
+        <!-- User data will be loaded here -->
+    </div>
+     <script>
+        // Fetch user data and populate the #user-info div
+        fetch('/api/users/me', 
+            {
+                headers: {
+                    Authentication: 'твой токен'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const userInfoDiv = document.getElementById('user-info');
+                userInfoDiv.innerHTML = `
+                    <p>Email: ${data.email}</p>
+                    <p>Balance: ${data.balance}</p>
+                    <p>Role: ${data.role}</p>
+                    <p>Status: ${data.status}</p>
+                    <!-- Add other user details here -->
+                `;
+            })
+            .catch(error => {
+                console.error('Error fetching user data:', error);
+                const userInfoDiv = document.getElementById('user-info');
+                userInfoDiv.innerHTML = `<p>Error loading user data: ${error.message}</p>`;
+
+            });
+    </script>
+</body>
+</html>

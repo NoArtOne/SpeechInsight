@@ -7,24 +7,24 @@ from schemas import CheckEmail
 
 load_dotenv()
 
-SMTP_EMAIL=os.getenv("SMTP_EMAIL")
-SMTP_PASSWORD=os.getenv("SMTP_PASSWORD")
-SMTP_SERVER=os.getenv("SMTP_SERVER")
-SMTP_PORT=int(os.getenv("SMTP_PORT"))
+SMTP_EMAIL = os.getenv("SMTP_EMAIL")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SMTP_SERVER = os.getenv("SMTP_SERVER")
+SMTP_PORT = int(os.getenv("SMTP_PORT"))
 
 # Функция отправки письма
-def send_email(dest_email: CheckEmail, subject_text: str, email_text:str):
+def send_email(dest_email: str, subject_text: str, email_text: str):
     """
     # Использование функции
     send_email(
-    "futurehouseprogressive@gmail.com",
-    "Тестирую отправку код авторизации для подтверждения пароля",
-    "Используй для регистрации или восстановления пароля этот код: 2187"
+        "futurehouseprogressive@gmail.com",
+        "Тестирую отправку код авторизации для подтверждения пароля",
+        "Используй для регистрации или восстановления пароля этот код: 2187"
+    )
     ARG: 
         dest_mail кому отправляем
         subject заголовок (header) письма
         email_text текст (body) письма  
-)
     """
     msg = EmailMessage()
     msg["From"] = SMTP_EMAIL
@@ -38,21 +38,23 @@ def send_email(dest_email: CheckEmail, subject_text: str, email_text:str):
         server.send_message(msg)
 
 from datetime import datetime, timedelta
-import time
 
 def how_time_has_passed(start_time: datetime, reference_time: int) -> tuple:
     """
-    Принимает start_time в формате datetime и считает сколько прошло времени
+    Принимает start_time в формате datetime и считает, сколько прошло времени
     с момента указаного в start_time, а также принимает переменную reference_time
-    если посчитанное значение превышает reference_time возвращает True, иначе
-    false
-    ARG
-        start_time: datetime, 
-        reference_time: int
+    (в секундах).
+    Если прошедшее время превышает reference_time, возвращает True и прошедшее время.
+    Иначе, возвращает False и прошедшее время.
+    
+    ARG:
+        start_time: datetime
+        reference_time: int (секунды)
+        
+    RETURNS:
+        tuple(bool, timedelta)
     """
     current_time = datetime.now()
     elapsed_time = current_time - start_time
-    return {
-        elapsed_time > timedelta(seconds=int(reference_time)),
-        timedelta(seconds=elapsed_time)
-    }
+    is_expired = elapsed_time > timedelta(seconds=reference_time)
+    return (is_expired, elapsed_time)

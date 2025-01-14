@@ -12,11 +12,7 @@ services:
       - RABBITMQ_USER=guest 
       - RABBITMQ_PASS=guest
     depends_on:
-      db:
-        condition: service_healthy  
       rabbitmq:
-        condition: service_healthy 
-      app:
         condition: service_healthy 
     ports:
       - "8181:8181"
@@ -33,14 +29,10 @@ services:
       - RABBITMQ_USER=guest 
       - RABBITMQ_PASS=guest
     depends_on:
-      db:
-        condition: service_healthy  
       rabbitmq:
         condition: service_healthy 
-      app:
-        condition: service_healthy 
     ports:
-      - "8181:8181"
+      - "8182:8182"
 
   db:
     image: postgres:16-alpine
@@ -90,14 +82,9 @@ services:
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
     depends_on:
       db:
-        condition: service_healthy  # Убедитесь, что db готов
+        condition: service_healthy 
       rabbitmq:
-        condition: service_healthy  # Убедитесь, что rabbitmq готов
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      
+        condition: service_healthy 
+
     ports:
       - "8000:8000"
