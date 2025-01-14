@@ -20,9 +20,10 @@ class User(SQLModel, table=True):
     balance: int = Field(default=100)
     role: str = Field(default="user")
     status: str = Field(default="disable")
+
     transactions: List["TransactionAudio"] = Relationship(back_populates="user", cascade_delete=True)
     requests: List["RequestAudio"] = Relationship(back_populates="user", cascade_delete=True)
-
+    confirmation_code: Optional["ConfirmationCode"] = Relationship(back_populates="user", cascade_delete=True)
 
 class ConfirmationCode(SQLModel, table=True):
     __tablename__ = "confirmationcode"
@@ -33,9 +34,12 @@ class ConfirmationCode(SQLModel, table=True):
     """
     id: int = Field(primary_key=True, unique=True)
     user_id: int = Field(foreign_key="user.id")
-    code: int  # 4-значный код
+    code: str  # 4-значный код
     expires_at: datetime  # Время истечения кода
     create_at: datetime = Field(default_factory=datetime.now())
+
+    user: User = Relationship(back_populates="confirmation_code")
+
 
 class TransactionAudio(SQLModel, table=True):
     """
@@ -51,6 +55,7 @@ class TransactionAudio(SQLModel, table=True):
     create_at: datetime = Field(default_factory=datetime.now())
     user: User = Relationship(back_populates="transactionaudio")
     request_id: Optional[int] = Field(foreign_key="requestaudio.id", nullable=True)
+
     request: Optional["RequestAudio"] = Relationship(back_populates="transactionaudio")
 
 class RequestAudio(SQLModel, table=True):
