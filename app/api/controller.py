@@ -42,7 +42,7 @@ import os
 load_dotenv()
 CODE_EXPIRATION_TIME = int(os.getenv("CODE_EXPIRATION_TIME", 30))  # В минутах
 CODE_REPEAT_RESPONSE_TIME = int(os.getenv("CODE_REPEAT_RESPONSE_TIME", 30))  # В секундах
-AMOUNT = int(os.getenv("AMOUNT", 100))  # Поправил опечатку AMOUT -> AMOUNT
+AMOUNT = int(os.getenv("AMOUNT", 1)) 
 
 router = APIRouter()
 
@@ -372,7 +372,7 @@ async def upload_audio(
         session.add(db_user) 
         session.commit()
         session.refresh(db_transaction)
-        send_to_rabbitmq(audio_bytes, original_format)
+        send_to_rabbitmq(audio_bytes, original_format, id_audio_users_requests = db_request.id)
     
 
         return {"message": "Файл успешно отправлен в RabbitMQ"}

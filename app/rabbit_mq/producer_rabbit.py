@@ -22,7 +22,7 @@ RESULT_QUEUE = os.getenv("RESULT_QUEUE")
 
 logger = logging.getLogger(__name__)
 
-def send_to_rabbitmq(audio_bytes, original_format):
+def send_to_rabbitmq(audio_bytes, original_format, id_audio_users_requests):
     """
     Отправляет байткод аудио и формат файла в RabbitMQ
     """
@@ -57,7 +57,8 @@ def send_to_rabbitmq(audio_bytes, original_format):
 
         message = {
             "audio_bytes": audio_bytes.hex(),  # Преобразуем байты в hex-строку для JSON
-            "original_format": original_format
+            "original_format": original_format,
+            "id_audio_users_requests": id_audio_users_requests
         }
         logger.info(f"message:Обработка байтов")
         channel.basic_publish(
