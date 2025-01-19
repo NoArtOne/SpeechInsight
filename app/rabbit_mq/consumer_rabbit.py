@@ -4,7 +4,6 @@ import select
 
 from fastapi import Depends
 from sqlmodel import Session, select
-# from sqlalchemy.orm import Session
 import aio_pika
 import json
 import asyncio
@@ -23,10 +22,10 @@ RESULT_QUEUE = os.getenv("RESULT_QUEUE")
 RABBITMQ_PORT=os.getenv("RABBITMQ_PORT") 
 RABBITMQ_USER=os.getenv("RABBITMQ_USER") 
 RABBITMQ_PASS=os.getenv("RABBITMQ_PASS")
+
 print(f"RABBITMQ_HOST: {RABBITMQ_HOST}, RABBITMQ_QUEUE:{RABBITMQ_QUEUE}, RESULT_QUEUE:{RESULT_QUEUE}")
 
 async def start_consume():
-    # connection = await aio_pika.connect_robust("amqp://guest:guest@localhost:5672/")
     connection1 = await aio_pika.connect_robust(f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASS}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/")
     async with connection1:
         channel = await connection1.channel()

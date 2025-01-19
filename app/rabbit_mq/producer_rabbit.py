@@ -9,13 +9,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-"""
-Этот код когда тестил mq
-RABBITMQ_HOST = 'localhost'
-RABBITMQ_QUEUE = 'audio_queue'
-RESULT_QUEUE = 'result_queue_1'
-"""
-
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
 RABBITMQ_QUEUE = os.getenv("RABBITMQ_QUEUE")
 RESULT_QUEUE = os.getenv("RESULT_QUEUE")
@@ -26,29 +19,7 @@ def send_to_rabbitmq(audio_bytes, original_format, id_audio_users_requests):
     """
     Отправляет байткод аудио и формат файла в RabbitMQ
     """
-    # connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
-    # channel = connection.channel()
-    # channel.queue_declare(queue=RABBITMQ_QUEUE)
-    # logger.info(f"НАЧАЛА СОЗДАНИЯ СООБЩЕНИИЯ")
-    # # Формируем сообщение: байткод аудио + формат файла
-    # message = {
-    #     "audio_bytes": audio_bytes.hex(),  # Преобразуем байты в hex-строку для JSON
-    #     "original_format": original_format
-    # }
-    # logger.info(f"message:{message}")
-    # # Конвертируем сообщение в JSON и отправляем
-    # channel.basic_publish(
-    #     exchange='',
-    #     routing_key=RABBITMQ_QUEUE,
-    #     body=json.dumps(message).encode('utf-8'),
-    #     # properties=pika.BasicProperties(
-    #     #     delivery_mode=2,  # Сделать сообщение устойчивым
-    #     # )
-    # )
-    # logger.info(f"СООБЩЕНИЕ ОТПРАВЛЕНО")
-    # # connection.close()
-
-    # connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
+   
     connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
     try:
         channel = connection.channel()
