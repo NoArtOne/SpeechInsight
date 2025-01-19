@@ -2,25 +2,25 @@
 <html>
 
 <head>
-    <title>Upload Audio</title>
+    <title>Загрузка вашего аудиофайла</title>
 </head>
 
 <body>
-    <h1>Upload Audio</h1>
+    <h1></h1>
     <form id="uploadForm" onsubmit="upload_audio(event)" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".mp3,.wav" required> <br><br>
-        <input type="submit" value="Upload">
+        <input type="file" name="file" accept=".mp3,.wav" required><br><br>
+        <input type="submit" value="Загрузить">
     </form>
-    <p><a href="/user_profile">Back to Profile</a></p>
+    <p><a href="/user_profile">Вернуть на главную страницу</a></p>
 </body>
-<!-- ДОБАВИТЬ ОГРАНИЧЕНИЕ ЗАГРУЗКИ ФАЙЛА 1 ГБ -->
+
 </html>
 <script>
     function upload_audio(event) {
         event.preventDefault();
 
-        const form = document.getElementById('uploadForm'); // Get the form element by its ID
-        const formData = new FormData(form); // Create FormData object from the form
+        const form = document.getElementById('uploadForm'); 
+        const formData = new FormData(form); 
 
         fetch("/api/audios", {
             method: 'POST',
@@ -32,6 +32,7 @@
             .then(response => {
                 if (response.ok) {
                     alert("Аудио успешно загружено");
+                    window.location.href = "/user_profile";
                 }
                 else {
                     return response.json().then(err => { // Parse JSON error response

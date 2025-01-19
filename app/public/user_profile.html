@@ -12,22 +12,24 @@
 
     <div id="user-info">
     </div>
-     <script>
-        console.log("access_token", localStorage.getItem("access_token"))
-        fetch('/api/users/me', 
-            
-            {
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem("access_token")}`
-                }
-            })
-            .then(response => {
+
+    <button id="logoutButton">Выйти</button>
+
+    <script>
+        // Функция для получения данных пользователя
+        async function fetchUserData() {
+            try {
+                const response = await fetch('/api/users/me', {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("access_token")}`
+                    }
+                });
+
                 if (!response.ok) {
-                    throw new Error('Network response fail: ' + response.statusText);
+                    throw new Error('Network response was not ok: ' + response.statusText);
                 }
-                return response.json();
-            })
-            .then(data => {
+
+                const data = await response.json();
                 const userInfoDiv = document.getElementById('user-info');
                 userInfoDiv.innerHTML = `
                     <p>Email: ${data.email}</p>
@@ -36,13 +38,26 @@
                     <p>Status: ${data.status}</p>
                     <!-- Add other user details here -->
                 `;
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('Error fetching user data:', error);
                 const userInfoDiv = document.getElementById('user-info');
                 userInfoDiv.innerHTML = `<p>Error loading user data: ${error.message}</p>`;
+            }
+        }
 
-            });
+        // Функция для выхода из аккаунта
+        function logout() {
+            // Удаляем токен из localStorage
+            localStorage.removeItem('access_token');
+            // Перенаправляем пользователя на страницу входа или другую страницу
+            window.location.href = "/login";
+        }
+
+        // Обработчик события клика на кнопку выхода
+        document.getElementById('logoutButton').addEventListener('click', logout);
+
+        // Инициализация: загружаем данные пользователя при загрузке страницы
+        document.addEventListener('DOMContentLoaded', fetchUserData);
     </script>
 </body>
 </html>

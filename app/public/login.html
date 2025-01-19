@@ -1,19 +1,113 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Login</title>
+    <title>SpeechInsight - Войти</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        
+        .container {
+            width: 300px;
+            margin: 50px auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .container h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .container form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .container form input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        
+        .container form button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .container form button:hover {
+            background-color: #3e8e41;
+        }
+
+        .error-message {
+            color: red;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-    <h1>Login</h1>
-    <form action="/users/login/" method="post">
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email" required><br><br>
+    <div class="container">
+        <h2>Войти</h2>
+        <!-- Убираем атрибут method="post" и добавляем id и onsubmit -->
+        <form id="loginForm" onsubmit="login(event)">
+            <div id="error-message" class="error-message"></div>
+            <input type="email" id="email" name="email" placeholder="Email" required>
+            <input type="password" id="password" name="password" placeholder="Пароль" required>
+            <button type="submit">Войти</button>
+        </form>
+        <p>Нет аккаунта? <a href="/register">Зарегистрироваться</a></p>
+    </div>
 
-        <label for="password">Password:</label>
-        <input type="password" id="password" name="password" required><br><br>
+    <script>
+        // Функция будет вызвана при нажатии кнопки "Войти" вместо стандартного сабмита формы
+        function login(event) {
+            event.preventDefault();
 
-        <input type="submit" value="Login">
-    </form>
-    <p>Don't have an account? <a href="/">Register</a></p>
+            // Cоздаём FormData из формы
+            const form = document.getElementById('loginForm');
+            const formData = new FormData(form);
+
+            // Отправляем запрос на сервер
+            fetch("/api/users/login/", {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                // Если статус 200-299, значит запрос прошёл успешно
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    // Если статус не 2xx, выбрасываем ошибку
+                    throw new Error("Неверный email или пароль");
+                }
+            })
+            .then(data => {
+                console.log("Успешный ответ:", data);
+                // Сохраняем токен в localStorage (или sessionStorage, по усмотрению)
+                localStorage.setItem('access_token', data.access_token);
+                localStorage.setItem('token_type', data.token_type);
+
+                // Перенаправляем пользователя на страницу профиля
+                window.location.href = "/user_profile";
+            })
+            .catch(error => {
+                console.error("Ошибка при логине:", error);
+                // Отобразим сообщение об ошибке 
+                document.getElementById('error-message').textContent = error.message;
+            });
+        }
+    </script>
 </body>
 </html>

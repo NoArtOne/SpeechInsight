@@ -231,7 +231,10 @@ async def verify_code(
 
             access_token = create_access_token(db_user.email, db_user.id)
             
-            return {"access_token": access_token, "token_type": "bearer", "redirect_url": "/user_profile"}
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "redirect_url": "/user_profile"}
 
 
     # Если кода нет, перенаправляем на повторную отправку
@@ -270,11 +273,19 @@ async def resend_code(
         return {"message": "Код подтверждения успешно отправлен на вашу почту."}
 
 @router.post("/api/users/login/")
-async def login(request: LoginRequest, session: Session = Depends(get_session)):
-    user = session.exec(select(User).where(User.email == request.email)).first()
-    if user and checkpw(request.password.encode('utf-8'), user.password):
+async def login(
+    email: str = Form(...),
+    password: str = Form(...),
+    session: Session = Depends(get_session)
+):
+    user = session.exec(select(User).where(User.email == email)).first()
+    if user and checkpw(password.encode('utf-8'), user.password):
         access_token = create_access_token(user.email, user.id)
-        return {"access_token": access_token, "token_type": "bearer"}
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "redirect_url": "/user_profile"
+        }
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -375,7 +386,7 @@ async def upload_audio(
         send_to_rabbitmq(audio_bytes, original_format, id_audio_users_requests = db_request.id)
     
 
-        return {"message": "Файл успешно отправлен в RabbitMQ"}
+        return RedirectResponse(url="/user_profile", status_code=303)
     except Exception as inst:
         logger.info(f"{Exception( exc_info=True)}")
 
